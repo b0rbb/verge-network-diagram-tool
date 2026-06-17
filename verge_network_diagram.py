@@ -210,7 +210,7 @@ class VergeAPIClient:
         return result or None
 
 
-def collect_data(client, type_filter=None):
+def collect_data(client, type_filter=None, skip_public_ip=False):
     print("Fetching data from VergeOS API...")
 
     settings = client.get_system_settings()
@@ -256,14 +256,15 @@ def collect_data(client, type_filter=None):
         dns_by_vnet[dz.get("vnet", 0)].append(dz)
 
     public_ip_by_vnet = {}
-    for net in networks:
-        if net.get("type") == "external":
-            print(f"  Running 'whatsmyip' diagnostic on {net.get('name')}...")
-            try:
-                public_ip_by_vnet[net["$key"]] = client.run_whatsmyip(net["$key"])
-            except Exception as e:
-                print(f"    (whatsmyip failed: {e})")
-                public_ip_by_vnet[net["$key"]] = None
+    if not skip_public_ip:
+        for net in networks:
+            if net.get("type") == "external":
+                print(f"  Running 'whatsmyip' diagnostic on {net.get('name')}...")
+                try:
+                    public_ip_by_vnet[net["$key"]] = client.run_whatsmyip(net["$key"])
+                except Exception as e:
+                    print(f"    (whatsmyip failed: {e})")
+                    public_ip_by_vnet[net["$key"]] = None
 
     return {
         "cloud_name": settings.get("cloud_name", ""),
@@ -462,8 +463,8 @@ def build_detail_node(net, data, theme):
     if net.get("mtu") and net["mtu"] != 1500:
         info_lines.append(f"MTU: {net['mtu']}")
 
-    if net_type == "external":
-        pub_ip = data.get("public_ip_by_vnet", {}).get(key)
+    if net_type == "external" and data.get("public_ip_by_vnet"):
+        pub_ip = data["public_ip_by_vnet"].get(key)
         info_lines.append(f"Public IP: {pub_ip if pub_ip else '(not detected)'}")
 
     services = build_service_list(key, data)
@@ -950,6 +951,11 @@ def main():
         help="Filter networks: external, internal, dmz, core, has-ip (comma-separated)",
     )
     parser.add_argument(
+        "--no-public-ip",
+        action="store_true",
+        help="Skip the whatsmyip diagnostic on external networks (faster)",
+    )
+    parser.add_argument(
         "--json-dump",
         action="store_true",
         help="Dump raw API data to JSON file for debugging",
@@ -962,7 +968,7 @@ def main():
     client = VergeAPIClient(args.url, args.username, args.password)
 
     try:
-        data = collect_data(client, type_filter)
+        data = collect_data(client, type_filter, skip_public_ip=args.no_public_ip)
     except requests.exceptions.ConnectionError:
         print(f"Error: Cannot connect to {args.url}", file=sys.stderr)
         sys.exit(1)

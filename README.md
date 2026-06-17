@@ -44,6 +44,7 @@ Options
 | `--background` | `light` | Theme: `light` (white) or `dark` (dark navy) |
 | `--layout` | `landscape` | Layout orientation: `landscape` or `portrait` |
 | `--filter` | (all networks) | Filter networks (see below) |
+| `--no-public-ip` | off | Skip the whatsmyip diagnostic (faster) |
 | `--json-dump` | off | Also save raw API data to a JSON file |
 
 Filter Examples
